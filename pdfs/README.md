@@ -8,7 +8,7 @@
 | pdf2.pdf | HCM 6th Ed. Vol.1 | HCM 6th Edition: A Guide for Multimodal Mobility Analysis — Volume 1 (Chapters 1–9: Concepts) | 330 |
 | pdf3.pdf | HCM 2000 (4th Ed.) | Highway Capacity Manual 2000 (4th Edition), Transportation Research Board | 1207 |
 | pdf4.pdf | HCM 2010 (5th Ed.) | Highway Capacity Manual 2010 (5th Edition), Transportation Research Board | 1475 |
-| pdf5.pdf | HCM 6th Ed. Vol.1 [dup] | Duplicate of pdf2 | 330 |
+| pdf6.pdf | HCM 6th Ed. Vol.2 | HCM 6th Edition — Volume 2 (Chapters 10–15: Uninterrupted Flow) | 342 |
 | pdf7.pdf | HCM 6th Ed. Vol.3 | HCM 6th Edition — Volume 3 (Chapters 16–24: Interrupted Flow) | 540 |
 
 ---
@@ -95,6 +95,14 @@
 - Chapter 21: Roundabouts
 - Chapter 23: Off-Street Pedestrian and Bicycle Facilities
 - Chapters 25–35: Supplemental chapters (Freeway, Weaving, Signalized Intersections, Stop-Controlled, Roundabouts, Interchange Ramp Terminals, Active Traffic Management)
+
+### HCM 6th Edition — Volume 2: Uninterrupted Flow (pdf6.pdf)
+- Chapter 10: Freeway Facilities Core Methodology
+- Chapter 11: Freeway Reliability Analysis
+- Chapter 12: Basic Freeway and Multilane Highway Segments
+- Chapter 13: Freeway Weaving Segments
+- Chapter 14: Freeway Merge and Diverge Segments
+- Chapter 15: Two-Lane Highways
 
 ### HCM 6th Edition — Volume 3: Interrupted Flow (pdf7.pdf)
 - Chapter 16: Urban Street Facilities
