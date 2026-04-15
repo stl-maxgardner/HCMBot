@@ -8,6 +8,11 @@ prebuilt SQLite index at `kb/hcm_kb.sqlite`.
 The goal is persistent agent context: new cloud agents can immediately query HCM
 content without re-downloading or re-ingesting all PDFs.
 
+If you are chatting with a cloud agent, you can just ask HCM questions in plain
+language. The repo includes a Cursor rule at `.cursor/rules/hcm-kb-agent.mdc`
+that tells agents to run retrieval against `kb/hcm_kb.sqlite` behind the scenes
+and answer with citations.
+
 Capabilities:
 
 - Ingest PDF text into a SQLite FTS index

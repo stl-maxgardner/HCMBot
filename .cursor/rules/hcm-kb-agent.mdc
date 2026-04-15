@@ -1,0 +1,17 @@
+---
+description: Use the persistent HCM knowledge base for HCM questions.
+alwaysApply: true
+---
+
+When the user asks questions about Highway Capacity Manual (HCM) concepts,
+methods, LOS, delay, capacity, signalized/unsignalized intersections, freeway
+segments, multimodal chapters, or other HCM topics:
+
+1. Query the committed knowledge base at `kb/hcm_kb.sqlite`.
+2. Use `python3 tools/hcm_kb.py ask "<question>" --limit 8` as the default retrieval step.
+3. Synthesize an answer in natural language directly in chat (do not ask the user to run CLI commands).
+4. Include citations to source file and page number from retrieved evidence.
+5. If evidence is weak or conflicting, say so explicitly and ask a clarifying follow-up.
+
+The goal is chat-first behavior: users should ask questions conversationally and
+the agent should perform retrieval behind the scenes.
