@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 import shutil
 import sqlite3
 import sys
@@ -13,7 +14,37 @@ from pathlib import Path
 
 from pypdf import PdfReader
 
-DEFAULT_DB_PATH = Path(".local_kb/hcm_kb.sqlite")
+DEFAULT_DB_PATH = Path("kb/hcm_kb.sqlite")
+QUESTION_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "for",
+    "from",
+    "how",
+    "in",
+    "is",
+    "it",
+    "of",
+    "on",
+    "or",
+    "that",
+    "the",
+    "to",
+    "was",
+    "what",
+    "when",
+    "where",
+    "which",
+    "who",
+    "why",
+    "with",
+}
 
 
 def utc_now_iso() -> str:
@@ -171,7 +202,22 @@ def cmd_query(args: argparse.Namespace) -> int:
     conn = connect_db(db_path)
     ensure_schema(conn)
 
-    rows = conn.execute(
+    rows = search_index(conn, args.query, args.limit)
+
+    if not rows:
+        print("No results.")
+        return 0
+
+    for idx, (path, page_number, score, preview) in enumerate(rows, start=1):
+        print(f"{idx}. {Path(path).name} (page {page_number}, score {score:.3f})")
+        print(f"   {preview}")
+    return 0
+
+
+def search_index(
+    conn: sqlite3.Connection, fts_query: str, limit: int
+) -> list[tuple[str, int, float, str]]:
+    return conn.execute(
         """
         SELECT
             path,
@@ -183,13 +229,50 @@ def cmd_query(args: argparse.Namespace) -> int:
         ORDER BY score
         LIMIT ?
         """,
-        (args.query, args.limit),
+        (fts_query, limit),
     ).fetchall()
 
+
+def question_to_fts_query(question: str, max_terms: int = 12) -> str:
+    tokens = re.findall(r"[a-z0-9]{3,}", question.lower())
+    filtered = [token for token in tokens if token not in QUESTION_STOPWORDS]
+
+    unique_terms: list[str] = []
+    seen: set[str] = set()
+    for token in filtered:
+        if token not in seen:
+            unique_terms.append(token)
+            seen.add(token)
+        if len(unique_terms) >= max_terms:
+            break
+
+    if unique_terms:
+        return " OR ".join(unique_terms)
+    return question.strip()
+
+
+def cmd_ask(args: argparse.Namespace) -> int:
+    db_path = resolve_db_path(args.db_path)
+    if not db_path.exists():
+        print(f"Database does not exist: {db_path}", file=sys.stderr)
+        return 1
+
+    conn = connect_db(db_path)
+    ensure_schema(conn)
+
+    fts_query = question_to_fts_query(args.question)
+    if not fts_query:
+        print("Question is empty.", file=sys.stderr)
+        return 1
+
+    rows = search_index(conn, fts_query, args.limit)
     if not rows:
-        print("No results.")
+        print("No evidence found for that question.")
         return 0
 
+    print(f"Question: {args.question}")
+    print(f"Search query: {fts_query}")
+    print("\nTop evidence passages:")
     for idx, (path, page_number, score, preview) in enumerate(rows, start=1):
         print(f"{idx}. {Path(path).name} (page {page_number}, score {score:.3f})")
         print(f"   {preview}")
@@ -324,6 +407,14 @@ def build_parser() -> argparse.ArgumentParser:
     query.add_argument("query", help="FTS query string")
     query.add_argument("--limit", type=int, default=8, help="Max results to return")
     query.set_defaults(func=cmd_query)
+
+    ask = subparsers.add_parser(
+        "ask",
+        help="Question-oriented retrieval with cited evidence passages",
+    )
+    ask.add_argument("question", help="Natural language question")
+    ask.add_argument("--limit", type=int, default=8, help="Max evidence passages")
+    ask.set_defaults(func=cmd_ask)
 
     stats = subparsers.add_parser("stats", help="Show KB index statistics")
     stats.set_defaults(func=cmd_stats)

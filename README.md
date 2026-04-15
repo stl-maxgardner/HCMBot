@@ -1,13 +1,19 @@
 # HCMBot
 
-## Durable local PDF knowledge base (without committing PDFs)
+## Persistent HCM knowledge base for agents
 
-This repo includes a lightweight knowledge-base CLI at `tools/hcm_kb.py` that:
+This repo includes a lightweight knowledge-base CLI at `tools/hcm_kb.py` and a
+prebuilt SQLite index at `kb/hcm_kb.sqlite`.
 
-- Ingests PDF text into a local SQLite FTS index
-- Supports fast keyword querying
-- Lets you export/import the index so knowledge persists across cloud sessions
-- Keeps raw PDFs and local index files out of git
+The goal is persistent agent context: new cloud agents can immediately query HCM
+content without re-downloading or re-ingesting all PDFs.
+
+Capabilities:
+
+- Ingest PDF text into a SQLite FTS index
+- Run keyword search (`query`) and question-oriented evidence retrieval (`ask`)
+- Export/import indexes for external backups
+- Keep raw PDFs out of git while optionally versioning the prebuilt DB
 
 ### 1) Install dependency
 
@@ -15,7 +21,16 @@ This repo includes a lightweight knowledge-base CLI at `tools/hcm_kb.py` that:
 python3 -m pip install -r requirements.txt
 ```
 
-### 2) Ingest PDFs
+### 2) Query immediately (no ingest required)
+
+Because `kb/hcm_kb.sqlite` is committed, you can query right away:
+
+```bash
+python3 tools/hcm_kb.py stats
+python3 tools/hcm_kb.py ask "What are key delay components at signalized intersections?" --limit 6
+```
+
+### 3) Rebuild or refresh the index from PDFs
 
 Use any local directory that contains your HCM PDFs.
 
@@ -23,22 +38,27 @@ Use any local directory that contains your HCM PDFs.
 python3 tools/hcm_kb.py ingest /path/to/pdfs --recursive
 ```
 
-By default, the index is stored at:
+By default, the index path is:
 
 ```text
-.local_kb/hcm_kb.sqlite
+kb/hcm_kb.sqlite
 ```
 
-That path is git-ignored via `.gitignore`.
+For temporary/local-only work, you can still use:
 
-### 3) Query the KB
+```bash
+python3 tools/hcm_kb.py --db-path .local_kb/hcm_kb.sqlite ingest /path/to/pdfs --recursive
+```
+
+### 4) Query the KB
 
 ```bash
 python3 tools/hcm_kb.py query "two lane highway capacity" --limit 5
+python3 tools/hcm_kb.py ask "How is LOS determined for unsignalized intersections?" --limit 8
 python3 tools/hcm_kb.py stats
 ```
 
-### 4) Persist KB outside ephemeral workspace
+### 5) Persist KB outside git as backup
 
 Export the DB to a location you sync externally (Drive/Dropbox/S3 mount/etc):
 
@@ -61,5 +81,5 @@ python3 tools/hcm_kb.py copy-backup /path/from/hcm_kb.sqlite /path/to/hcm_kb.sql
 ### Notes
 
 - Raw PDFs are not committed unless you explicitly add them to git.
-- Exported DB files are portable SQLite files and can be backed up anywhere.
+- The committed DB (`kb/hcm_kb.sqlite`) gives fast startup for new agents.
 - Re-running `ingest` only re-indexes changed PDFs (hash-based skip).
