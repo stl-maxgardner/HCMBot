@@ -1,0 +1,3 @@
+.local_kb/
+__pycache__/
+*.pyc
