@@ -1,0 +1,39 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_IMAGE_URI}
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_IMAGE_URI}
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE_NAME}
+      - --image
+      - ${_IMAGE_URI}
+      - --region
+      - ${_REGION}
+      - --platform
+      - managed
+      - --allow-unauthenticated
+      - --set-env-vars
+      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${_REGION},VERTEX_MODEL=${_VERTEX_MODEL},HCM_DB_PATH=kb/hcm_kb.sqlite
+      - --set-secrets
+      - SLACK_BOT_TOKEN=slack-bot-token:latest,SLACK_SIGNING_SECRET=slack-signing-secret:latest
+
+images:
+  - ${_IMAGE_URI}
+
+substitutions:
+  _SERVICE_NAME: hcm-slackbot
+  _REGION: us-central1
+  _VERTEX_MODEL: gemini-2.0-flash-001
+  _IMAGE_URI: ${_REGION}-docker.pkg.dev/${PROJECT_ID}/hcm-slackbot/hcm-slackbot:${SHORT_SHA}

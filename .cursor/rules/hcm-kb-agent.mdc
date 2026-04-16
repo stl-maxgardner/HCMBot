@@ -1,0 +1,39 @@
+---
+description: Use the persistent HCM knowledge base for HCM questions.
+alwaysApply: true
+---
+
+When the user asks questions about Highway Capacity Manual (HCM) concepts,
+methods, LOS, delay, capacity, signalized/unsignalized intersections, freeway
+segments, multimodal chapters, or other HCM topics, use chat-first retrieval:
+
+1. Query the committed knowledge base at `kb/hcm_kb.sqlite` directly (do not
+   ask the user to run commands).
+2. Use an internal Python `sqlite3` query with FTS + `bm25` + `snippet`
+   against `page_index`.
+3. Return a natural-language answer in chat with source citations (file + page).
+4. If evidence quality is weak or conflicting, say so explicitly and ask a
+   clarifying follow-up question.
+
+Suggested internal retrieval pattern:
+
+```bash
+python3 - <<'PY'
+import sqlite3
+db = sqlite3.connect("kb/hcm_kb.sqlite")
+q = "signalized OR intersection OR delay"
+rows = db.execute(
+    """
+    SELECT path, page_number, bm25(page_index) AS score,
+           snippet(page_index, 2, '[', ']', ' ... ', 24) AS preview
+    FROM page_index
+    WHERE page_index MATCH ?
+    ORDER BY score
+    LIMIT 8
+    """,
+    (q,),
+).fetchall()
+for path, page, score, preview in rows:
+    print(path, page, score, preview)
+PY
+```

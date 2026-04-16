@@ -1,0 +1,5 @@
+.local_kb/
+__pycache__/
+*.pyc
+kb/*.sqlite-wal
+kb/*.sqlite-shm
