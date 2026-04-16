@@ -165,8 +165,9 @@ environment variables at runtime using `--set-secrets`.
 
 ## Optional fallback: no-deploy mode via GitHub Actions
 
-If you want coworkers to use the bot without running anything locally, use the
-included workflow:
+Coworkers can already use the bot directly in Slack once the Cloud Run deployment
+is live and the bot is invited to channels. The workflow below is an alternative
+for cases where you do not want to run a persistent Cloud Run service.
 
 ```text
 .github/workflows/hcm-slackbot-poller.yml
@@ -193,7 +194,7 @@ In configured channels, coworkers can ask by:
 - Or prefixing a message: `hcm: explain multilane highway capacity assumptions`
 
 No deployment or local runtime is needed for coworkers, but replies are near-real-time
-rather than instant because this mode runs on a schedule.
+rather than instant because this fallback mode runs on a schedule.
 
 ## Cursor agent behavior
 
