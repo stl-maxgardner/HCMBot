@@ -29,13 +29,16 @@ In Slack API dashboard:
 2. Under **OAuth & Permissions**, add bot token scopes:
    - `app_mentions:read`
    - `chat:write`
-   - `channels:history` (optional but useful)
+   - `channels:history` (recommended)
+   - `im:history` (required for DM support)
+   - `im:read` (recommended for DM behavior)
    - `groups:history` (optional for private channels)
 3. Enable **Event Subscriptions**:
    - Turn on Event Subscriptions
    - Request URL: `https://YOUR_CLOUD_RUN_URL/slack/events`
    - Subscribe to bot event:
    - `app_mention`
+   - `message.im` (required for direct messages)
 4. Install app to workspace.
 5. Invite bot to channel(s): `/invite @your-bot-name`
 
@@ -153,6 +156,9 @@ https://YOUR_CLOUD_RUN_URL/slack/events
 After setting that in Slack Event Subscriptions, mention the bot in Slack:
 
 `@hcmbot What are major LOS differences between HCM 2000 and 2010?`
+
+You can also DM the bot directly with plain questions (no mention prefix needed),
+once `message.im` is subscribed and `im:*` scopes are granted.
 
 The bot retrieves evidence from `kb/hcm_kb.sqlite`, then synthesizes an answer
 with citations (filename + page).
