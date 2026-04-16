@@ -70,6 +70,55 @@ gcloud run deploy hcm-slackbot \
   --set-secrets SLACK_BOT_TOKEN=slack-bot-token:latest,SLACK_SIGNING_SECRET=slack-signing-secret:latest
 ```
 
+### 4b) Optional: one-command deploys with Cloud Build
+
+This repo includes:
+
+```text
+cloudbuild.yaml
+```
+
+It builds the container, pushes it, and deploys Cloud Run with Secret Manager
+bindings.
+
+Create Artifact Registry repo once:
+
+```bash
+gcloud artifacts repositories create hcm-slackbot \
+  --repository-format=docker \
+  --location="$REGION"
+```
+
+Grant Cloud Build runtime permissions (once):
+
+```bash
+PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+CLOUDBUILD_SA="${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${CLOUDBUILD_SA}" \
+  --role="roles/run.admin"
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${CLOUDBUILD_SA}" \
+  --role="roles/iam.serviceAccountUser"
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${CLOUDBUILD_SA}" \
+  --role="roles/secretmanager.secretAccessor"
+```
+
+Run deploy via Cloud Build:
+
+```bash
+gcloud builds submit \
+  --config cloudbuild.yaml \
+  --substitutions=_SERVICE_NAME=hcm-slackbot,_REGION="$REGION",_VERTEX_MODEL=gemini-2.0-flash-001
+```
+
+Optional: create a GitHub trigger in Cloud Build UI pointing to `main` so deploys
+happen automatically on each push.
+
 Your service will expose:
 
 ```text
