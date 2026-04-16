@@ -13,7 +13,7 @@ It can be used by:
 - Cursor agents (via `.cursor/rules/hcm-kb-agent.mdc`)
 - A Slack bot (`tools/hcm_slackbot.py`) for chat-based HCM Q&A
 
-## Slack bot setup
+## Slack bot (always-on Socket Mode, recommended)
 
 ### 1) Install dependencies
 
@@ -47,7 +47,30 @@ export OPENAI_MODEL="gpt-4.1-mini"  # optional
 export HCM_DB_PATH="kb/hcm_kb.sqlite"  # optional
 ```
 
-### 4) Run bot
+### 4) Run always-on runtime
+
+#### Option A: Docker (recommended)
+
+```bash
+docker build -t hcm-slackbot .
+docker run --rm \
+  -e SLACK_BOT_TOKEN \
+  -e SLACK_APP_TOKEN \
+  -e OPENAI_API_KEY \
+  -e OPENAI_MODEL \
+  -e HCM_DB_PATH=kb/hcm_kb.sqlite \
+  hcm-slackbot
+```
+
+#### Option B: Process host (Railway/Render/Fly/VM)
+
+Use:
+
+```text
+Procfile
+```
+
+with worker command:
 
 ```bash
 python3 tools/hcm_slackbot.py
@@ -63,7 +86,7 @@ python3 tools/hcm_slackbot.py
 The bot retrieves evidence from `kb/hcm_kb.sqlite`, then synthesizes an answer
 with citations (filename + page).
 
-## No-deploy mode for coworkers (GitHub Actions)
+## Optional fallback: no-deploy mode via GitHub Actions
 
 If you want coworkers to use the bot without running anything locally, use the
 included workflow:
@@ -92,7 +115,8 @@ In configured channels, coworkers can ask by:
 - Mentioning the bot: `@hcmbot what changed from HCM 2000 to 2010 for freeway LOS?`
 - Or prefixing a message: `hcm: explain multilane highway capacity assumptions`
 
-No deployment or local runtime is needed for coworkers.
+No deployment or local runtime is needed for coworkers, but replies are near-real-time
+rather than instant because this mode runs on a schedule.
 
 ## Cursor agent behavior
 
