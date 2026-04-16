@@ -116,6 +116,25 @@ gcloud builds submit \
   --substitutions=_SERVICE_NAME=hcm-slackbot,_REGION="$REGION",_VERTEX_MODEL=gemini-2.0-flash-001
 ```
 
+### 4c) Optional: bootstrap script for one-time setup
+
+Use the helper script to enable APIs, create Artifact Registry, and set IAM roles:
+
+```bash
+chmod +x scripts/bootstrap_gcp.sh
+scripts/bootstrap_gcp.sh --project "$PROJECT_ID" --region "$REGION"
+```
+
+If you want the script to also set secret values:
+
+```bash
+scripts/bootstrap_gcp.sh \
+  --project "$PROJECT_ID" \
+  --region "$REGION" \
+  --slack-bot-token "xoxb-..." \
+  --slack-signing-secret "your-signing-secret"
+```
+
 Optional: create a GitHub trigger in Cloud Build UI pointing to `main` so deploys
 happen automatically on each push.
 
