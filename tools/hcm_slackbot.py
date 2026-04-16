@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Slack bot for querying HCM SQLite knowledge base."""
+"""Slack Events API bot for querying the HCM SQLite knowledge base."""
 
 from __future__ import annotations
 
@@ -9,13 +9,16 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from openai import OpenAI
+from flask import Flask, jsonify, request
+from google import genai
 from slack_bolt import App
-from slack_bolt.adapter.socket_mode import SocketModeHandler
+from slack_bolt.adapter.flask import SlackRequestHandler
 
 DB_PATH = Path(os.getenv("HCM_DB_PATH", "kb/hcm_kb.sqlite"))
 TOP_K = int(os.getenv("HCM_TOP_K", "8"))
 MAX_CHARS_PER_SNIPPET = int(os.getenv("HCM_MAX_CHARS_PER_SNIPPET", "650"))
+VERTEX_MODEL = os.getenv("VERTEX_MODEL", "gemini-2.0-flash-001")
+GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 
 QUESTION_STOPWORDS = {
     "a",
@@ -50,7 +53,7 @@ QUESTION_STOPWORDS = {
 
 
 def ensure_env() -> None:
-    required = ["SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "OPENAI_API_KEY"]
+    required = ["SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET", "GOOGLE_CLOUD_PROJECT"]
     missing = [name for name in required if not os.getenv(name)]
     if missing:
         raise RuntimeError(
@@ -62,7 +65,7 @@ def ensure_env() -> None:
 
 def question_to_fts_query(question: str, max_terms: int = 12) -> str:
     tokens = re.findall(r"[a-z0-9]{3,}", question.lower())
-    filtered = [t for t in tokens if t not in QUESTION_STOPWORDS]
+    filtered = [token for token in tokens if token not in QUESTION_STOPWORDS]
     unique_terms: list[str] = []
     seen: set[str] = set()
     for token in filtered:
@@ -102,73 +105,64 @@ def search_hcm(question: str, top_k: int = TOP_K) -> list[dict[str, Any]]:
     finally:
         conn.close()
 
-    results = []
-    for path, page, score, preview, content in rows:
-        results.append(
-            {
-                "doc_name": Path(path).name,
-                "page": page,
-                "score": score,
-                "preview": preview,
-                "content": content,
-            }
-        )
-    return results
+    return [
+        {
+            "doc_name": Path(path).name,
+            "page": page,
+            "score": score,
+            "preview": preview,
+            "content": content,
+        }
+        for path, page, score, preview, content in rows
+    ]
 
 
 def build_prompt(question: str, evidence: list[dict[str, Any]]) -> str:
-    parts = []
+    snippets = []
     for idx, item in enumerate(evidence, start=1):
-        parts.append(
+        snippets.append(
             (
                 f"[{idx}] {item['doc_name']} p.{item['page']}\n"
                 f"Preview: {item['preview']}\n"
                 f"Text: {item['content']}\n"
             )
         )
-    evidence_blob = "\n".join(parts)
+
     return (
-        "You are an assistant answering Highway Capacity Manual questions.\n"
-        "Use only the provided evidence passages.\n"
-        "If evidence is insufficient or conflicting, state uncertainty clearly.\n"
-        "Return:\n"
-        "1) A concise answer (2-6 bullets max)\n"
-        "2) A 'Citations' section listing source filename and page.\n\n"
+        "You answer Highway Capacity Manual questions.\n"
+        "Use only the evidence snippets provided.\n"
+        "If evidence is weak or conflicting, state uncertainty.\n"
+        "Respond with:\n"
+        "- concise answer (2-6 bullets)\n"
+        "- 'Citations' section with filename + page\n\n"
         f"Question: {question}\n\n"
-        f"Evidence:\n{evidence_blob}"
+        f"Evidence:\n{''.join(snippets)}"
     )
 
 
-def answer_with_openai(question: str, evidence: list[dict[str, Any]]) -> str:
+def answer_with_vertex(question: str, evidence: list[dict[str, Any]]) -> str:
     if not evidence:
         return (
             "I couldn't find strong evidence in the HCM index for that question. "
             "Try rephrasing or narrowing the topic."
         )
 
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    prompt = build_prompt(question, evidence)
-    response = client.responses.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
-        input=prompt,
-        max_output_tokens=700,
+    client = genai.Client(
+        vertexai=True,
+        project=os.environ["GOOGLE_CLOUD_PROJECT"],
+        location=GOOGLE_CLOUD_LOCATION,
     )
-    text = getattr(response, "output_text", "").strip()
-    if text:
-        return text
-
-    # Fallback for SDK variants.
-    chunks = []
-    for item in getattr(response, "output", []):
-        for content in getattr(item, "content", []):
-            if getattr(content, "type", "") == "output_text":
-                chunks.append(getattr(content, "text", ""))
-    joined = "\n".join(c for c in chunks if c).strip()
-    return joined or "I couldn't generate an answer right now."
+    prompt = build_prompt(question, evidence)
+    response = client.models.generate_content(model=VERTEX_MODEL, contents=prompt)
+    text = (response.text or "").strip()
+    return text or "I couldn't generate an answer right now."
 
 
-def create_app() -> App:
-    app = App(token=os.getenv("SLACK_BOT_TOKEN"))
+def create_bolt_app() -> App:
+    app = App(
+        token=os.environ["SLACK_BOT_TOKEN"],
+        signing_secret=os.environ["SLACK_SIGNING_SECRET"],
+    )
 
     @app.event("app_mention")
     def handle_app_mention(event: dict[str, Any], say) -> None:  # type: ignore[no-untyped-def]
@@ -178,31 +172,35 @@ def create_app() -> App:
             say("Ask me an HCM question after mentioning me.")
             return
 
-        say("Looking that up in the HCM knowledge base...")
+        say("Searching the HCM knowledge base...")
         evidence = search_hcm(question)
-        answer = answer_with_openai(question, evidence)
-        say(answer)
-
-    @app.message(re.compile(r"^hcm:\s+", re.IGNORECASE))
-    def handle_prefixed_message(message: dict[str, Any], say) -> None:  # type: ignore[no-untyped-def]
-        text = message.get("text", "")
-        question = re.sub(r"^hcm:\s+", "", text, flags=re.IGNORECASE).strip()
-        if not question:
-            say("Use `hcm: <your question>`.")
-            return
-        say("Searching HCM...")
-        evidence = search_hcm(question)
-        answer = answer_with_openai(question, evidence)
+        answer = answer_with_vertex(question, evidence)
         say(answer)
 
     return app
 
 
-def main() -> None:
+def create_flask_app() -> Flask:
     ensure_env()
-    app = create_app()
-    handler = SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"])
-    handler.start()
+    bolt_app = create_bolt_app()
+    handler = SlackRequestHandler(bolt_app)
+    app = Flask(__name__)
+
+    @app.get("/")
+    def health() -> Any:
+        return jsonify({"ok": True})
+
+    @app.post("/slack/events")
+    def slack_events() -> Any:
+        return handler.handle(request)
+
+    return app
+
+
+def main() -> None:
+    app = create_flask_app()
+    port = int(os.getenv("PORT", "8080"))
+    app.run(host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":

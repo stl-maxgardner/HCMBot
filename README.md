@@ -13,7 +13,7 @@ It can be used by:
 - Cursor agents (via `.cursor/rules/hcm-kb-agent.mdc`)
 - A Slack bot (`tools/hcm_slackbot.py`) for chat-based HCM Q&A
 
-## Slack bot (always-on Socket Mode, recommended)
+## Slack bot (minimal GCP setup: Cloud Run + Secret Manager)
 
 ### 1) Install dependencies
 
@@ -26,65 +26,74 @@ python3 -m pip install -r requirements.txt
 In Slack API dashboard:
 
 1. Create app from scratch.
-2. Enable **Socket Mode** and create an app-level token with
-   `connections:write` scope.
-3. Enable **Event Subscriptions** and subscribe to bot event:
-   - `app_mention`
-4. Under **OAuth & Permissions**, add bot token scopes:
+2. Under **OAuth & Permissions**, add bot token scopes:
    - `app_mentions:read`
-   - `channels:history`
    - `chat:write`
+   - `channels:history` (optional but useful)
    - `groups:history` (optional for private channels)
-5. Install app to workspace.
+3. Enable **Event Subscriptions**:
+   - Turn on Event Subscriptions
+   - Request URL: `https://YOUR_CLOUD_RUN_URL/slack/events`
+   - Subscribe to bot event:
+   - `app_mention`
+4. Install app to workspace.
+5. Invite bot to channel(s): `/invite @your-bot-name`
 
-### 3) Configure environment
-
-```bash
-export SLACK_BOT_TOKEN="xoxb-..."
-export SLACK_APP_TOKEN="xapp-..."
-export OPENAI_API_KEY="sk-..."
-export OPENAI_MODEL="gpt-4.1-mini"  # optional
-export HCM_DB_PATH="kb/hcm_kb.sqlite"  # optional
-```
-
-### 4) Run always-on runtime
-
-#### Option A: Docker (recommended)
+### 3) Create GCP secrets (one-time)
 
 ```bash
-docker build -t hcm-slackbot .
-docker run --rm \
-  -e SLACK_BOT_TOKEN \
-  -e SLACK_APP_TOKEN \
-  -e OPENAI_API_KEY \
-  -e OPENAI_MODEL \
-  -e HCM_DB_PATH=kb/hcm_kb.sqlite \
-  hcm-slackbot
+gcloud secrets create slack-bot-token --replication-policy=automatic
+printf "%s" "xoxb-..." | gcloud secrets versions add slack-bot-token --data-file=-
+
+gcloud secrets create slack-signing-secret --replication-policy=automatic
+printf "%s" "your-signing-secret" | gcloud secrets versions add slack-signing-secret --data-file=-
 ```
 
-#### Option B: Process host (Railway/Render/Fly/VM)
+### 4) Deploy to Cloud Run
 
-Use:
+Set project vars:
+
+```bash
+export PROJECT_ID="your-gcp-project-id"
+export REGION="us-central1"
+gcloud config set project "$PROJECT_ID"
+```
+
+Deploy from source:
+
+```bash
+gcloud run deploy hcm-slackbot \
+  --source . \
+  --region "$REGION" \
+  --allow-unauthenticated \
+  --set-env-vars GOOGLE_CLOUD_PROJECT="$PROJECT_ID",GOOGLE_CLOUD_LOCATION="$REGION",VERTEX_MODEL=gemini-2.0-flash-001,HCM_DB_PATH=kb/hcm_kb.sqlite \
+  --set-secrets SLACK_BOT_TOKEN=slack-bot-token:latest,SLACK_SIGNING_SECRET=slack-signing-secret:latest
+```
+
+Your service will expose:
 
 ```text
-Procfile
+POST /slack/events
 ```
 
-with worker command:
+### 5) Configure Slack Request URL
 
 ```bash
-python3 tools/hcm_slackbot.py
+https://YOUR_CLOUD_RUN_URL/slack/events
 ```
 
-### 5) Ask questions in Slack
+After setting that in Slack Event Subscriptions, mention the bot in Slack:
 
-- Mention the bot in a channel:
-  - `@hcmbot What are major LOS differences between HCM 2000 and 2010?`
-- Or use prefixed message:
-  - `hcm: how is capacity estimated for basic freeway segments?`
+`@hcmbot What are major LOS differences between HCM 2000 and 2010?`
 
 The bot retrieves evidence from `kb/hcm_kb.sqlite`, then synthesizes an answer
 with citations (filename + page).
+
+### Secret Manager notes
+
+Secret Manager stores sensitive values (like Slack tokens) securely so they are
+not committed to git or hardcoded in the app. Cloud Run injects them as
+environment variables at runtime using `--set-secrets`.
 
 ## Optional fallback: no-deploy mode via GitHub Actions
 

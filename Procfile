@@ -1,1 +1,1 @@
-worker: python tools/hcm_slackbot.py
+web: python tools/hcm_slackbot.py
