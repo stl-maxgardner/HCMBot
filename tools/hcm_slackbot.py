@@ -158,6 +158,16 @@ def answer_with_vertex(question: str, evidence: list[dict[str, Any]]) -> str:
     return text or "I couldn't generate an answer right now."
 
 
+def handle_question(question: str, say) -> None:  # type: ignore[no-untyped-def]
+    if not question:
+        say("Ask me an HCM question.")
+        return
+    say("Searching the HCM knowledge base...")
+    evidence = search_hcm(question)
+    answer = answer_with_vertex(question, evidence)
+    say(answer)
+
+
 def create_bolt_app() -> App:
     app = App(
         token=os.environ["SLACK_BOT_TOKEN"],
@@ -171,11 +181,18 @@ def create_bolt_app() -> App:
         if not question:
             say("Ask me an HCM question after mentioning me.")
             return
+        handle_question(question, say)
 
-        say("Searching the HCM knowledge base...")
-        evidence = search_hcm(question)
-        answer = answer_with_vertex(question, evidence)
-        say(answer)
+    @app.event("message")
+    def handle_direct_message(event: dict[str, Any], say) -> None:  # type: ignore[no-untyped-def]
+        if event.get("channel_type") != "im":
+            return
+        if event.get("bot_id") or event.get("subtype"):
+            return
+        text = (event.get("text") or "").strip()
+        if not text:
+            return
+        handle_question(text, say)
 
     return app
 
