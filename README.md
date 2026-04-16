@@ -63,6 +63,37 @@ python3 tools/hcm_slackbot.py
 The bot retrieves evidence from `kb/hcm_kb.sqlite`, then synthesizes an answer
 with citations (filename + page).
 
+## No-deploy mode for coworkers (GitHub Actions)
+
+If you want coworkers to use the bot without running anything locally, use the
+included workflow:
+
+```text
+.github/workflows/hcm-slackbot-poller.yml
+```
+
+It runs every 5 minutes and posts threaded answers in configured Slack channels.
+
+### One-time maintainer setup
+
+1. In GitHub repo **Settings → Secrets and variables → Actions**:
+   - Add secret `SLACK_BOT_TOKEN` (xoxb token)
+   - Add secret `OPENAI_API_KEY`
+2. Add repository variable `HCM_CHANNEL_IDS` with comma-separated Slack channel IDs
+   (e.g., `C0123456789,C0987654321`).
+3. Optional: add repo variable `OPENAI_MODEL` (default `gpt-4.1-mini`).
+4. Ensure the Slack bot is invited to those channels.
+5. Merge this PR; workflow starts automatically on schedule.
+
+### How coworkers use it
+
+In configured channels, coworkers can ask by:
+
+- Mentioning the bot: `@hcmbot what changed from HCM 2000 to 2010 for freeway LOS?`
+- Or prefixing a message: `hcm: explain multilane highway capacity assumptions`
+
+No deployment or local runtime is needed for coworkers.
+
 ## Cursor agent behavior
 
 For Cursor Cloud Agents, `.cursor/rules/hcm-kb-agent.mdc` is set to
