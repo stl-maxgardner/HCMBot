@@ -2,3 +2,4 @@ openai
 slack-bolt
 flask
 google-genai
+pypdf

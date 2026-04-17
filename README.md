@@ -8,6 +8,27 @@ This repo includes a prebuilt SQLite full-text index at:
 kb/hcm_kb.sqlite
 ```
 
+## Rebuilding the KB (without committing PDFs)
+
+You can regenerate `kb/hcm_kb.sqlite` from a local PDF directory that is outside
+this repo (or in a git-ignored path).
+
+Example:
+
+```bash
+python3 scripts/rebuild_kb.py \
+  --pdf-dir /absolute/path/to/local/hcm_pdfs \
+  --recursive \
+  --reset
+```
+
+Notes:
+
+- Source PDFs are **not** required to be in the repo.
+- The script indexes PDF text and writes only to `kb/hcm_kb.sqlite`.
+- Use `--force` to re-index unchanged files.
+- Use `--db-path` if you want to build to an alternate sqlite output path.
+
 It can be used by:
 
 - Cursor agents (via `.cursor/rules/hcm-kb-agent.mdc`)
