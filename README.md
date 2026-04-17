@@ -62,6 +62,17 @@ export REGION="us-central1"
 gcloud config set project "$PROJECT_ID"
 ```
 
+Run deploy commands from the repository root (the directory containing
+`cloudbuild.yaml`, `Dockerfile`, and `kb/`) so `--source .` uploads the correct
+project:
+
+```bash
+cd /absolute/path/to/HCMBot
+pwd
+```
+
+If you are not in repo root, use an absolute source path instead of `.`.
+
 Deploy from source:
 
 ```bash
