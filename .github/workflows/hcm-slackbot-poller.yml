@@ -21,7 +21,17 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
+      - name: Skip notice when poller secrets are missing
+        if: ${{ !(secrets.SLACK_BOT_TOKEN != '' && secrets.OPENAI_API_KEY != '' && vars.HCM_CHANNEL_IDS != '') }}
+        run: |
+          echo "Skipping HCM poller run."
+          echo "Set GitHub Actions secrets/vars to enable:"
+          echo "  - secrets.SLACK_BOT_TOKEN"
+          echo "  - secrets.OPENAI_API_KEY"
+          echo "  - vars.HCM_CHANNEL_IDS"
+
       - name: Run Slack poller
+        if: ${{ secrets.SLACK_BOT_TOKEN != '' && secrets.OPENAI_API_KEY != '' && vars.HCM_CHANNEL_IDS != '' }}
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
