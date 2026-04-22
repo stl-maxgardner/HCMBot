@@ -8,6 +8,27 @@ This repo includes a prebuilt SQLite full-text index at:
 kb/hcm_kb.sqlite
 ```
 
+## Rebuilding the KB (without committing PDFs)
+
+You can regenerate `kb/hcm_kb.sqlite` from a local PDF directory that is outside
+this repo (or in a git-ignored path).
+
+Example:
+
+```bash
+python3 scripts/rebuild_kb.py \
+  --pdf-dir /absolute/path/to/local/hcm_pdfs \
+  --recursive \
+  --reset
+```
+
+Notes:
+
+- Source PDFs are **not** required to be in the repo.
+- The script indexes PDF text and writes only to `kb/hcm_kb.sqlite`.
+- Use `--force` to re-index unchanged files.
+- Use `--db-path` if you want to build to an alternate sqlite output path.
+
 It can be used by:
 
 - Cursor agents (via `.cursor/rules/hcm-kb-agent.mdc`)
@@ -80,6 +101,7 @@ gcloud run deploy hcm-slackbot \
   --source . \
   --region "$REGION" \
   --allow-unauthenticated \
+  --service-account hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com \
   --set-env-vars GOOGLE_CLOUD_PROJECT="$PROJECT_ID",GOOGLE_CLOUD_LOCATION="$REGION",VERTEX_MODEL=gemini-2.0-flash-001,HCM_DB_PATH=kb/hcm_kb.sqlite \
   --set-secrets SLACK_BOT_TOKEN=slack-bot-token:latest,SLACK_SIGNING_SECRET=slack-signing-secret:latest
 ```
@@ -120,6 +142,14 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${CLOUDBUILD_SA}" \
   --role="roles/secretmanager.secretAccessor"
+
+gcloud secrets add-iam-policy-binding slack-bot-token \
+  --member="serviceAccount:hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+
+gcloud secrets add-iam-policy-binding slack-signing-secret \
+  --member="serviceAccount:hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
 ```
 
 Run deploy via Cloud Build:
@@ -127,7 +157,7 @@ Run deploy via Cloud Build:
 ```bash
 gcloud builds submit \
   --config cloudbuild.yaml \
-  --substitutions=_SERVICE_NAME=hcm-slackbot,_REGION="$REGION",_VERTEX_MODEL=gemini-2.0-flash-001
+  --substitutions=_SERVICE_NAME=hcm-slackbot,_REGION="$REGION",_VERTEX_MODEL=gemini-2.0-flash-001,_RUNTIME_SERVICE_ACCOUNT=hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com
 ```
 
 ### 4c) Optional: bootstrap script for one-time setup

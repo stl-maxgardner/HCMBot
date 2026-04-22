@@ -24,6 +24,8 @@ steps:
       - --platform
       - managed
       - --allow-unauthenticated
+      - --service-account
+      - ${_RUNTIME_SERVICE_ACCOUNT}
       - --set-env-vars
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${_REGION},VERTEX_MODEL=${_VERTEX_MODEL},HCM_DB_PATH=kb/hcm_kb.sqlite
       - --set-secrets
@@ -36,4 +38,5 @@ substitutions:
   _SERVICE_NAME: hcm-slackbot
   _REGION: us-central1
   _VERTEX_MODEL: gemini-2.0-flash-001
+  _RUNTIME_SERVICE_ACCOUNT: hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com
   _IMAGE_URI: ${_REGION}-docker.pkg.dev/${PROJECT_ID}/hcm-slackbot/hcm-slackbot:${SHORT_SHA}
