@@ -209,6 +209,9 @@ def create_flask_app() -> Flask:
 
     @app.post("/slack/events")
     def slack_events() -> Any:
+        payload = request.get_json(silent=True) or {}
+        if payload.get("type") == "url_verification" and "challenge" in payload:
+            return jsonify({"challenge": payload["challenge"]})
         return handler.handle(request)
 
     return app
