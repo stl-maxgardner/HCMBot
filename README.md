@@ -101,6 +101,7 @@ gcloud run deploy hcm-slackbot \
   --source . \
   --region "$REGION" \
   --allow-unauthenticated \
+  --service-account hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com \
   --set-env-vars GOOGLE_CLOUD_PROJECT="$PROJECT_ID",GOOGLE_CLOUD_LOCATION="$REGION",VERTEX_MODEL=gemini-2.0-flash-001,HCM_DB_PATH=kb/hcm_kb.sqlite \
   --set-secrets SLACK_BOT_TOKEN=slack-bot-token:latest,SLACK_SIGNING_SECRET=slack-signing-secret:latest
 ```
@@ -141,6 +142,14 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${CLOUDBUILD_SA}" \
   --role="roles/secretmanager.secretAccessor"
+
+gcloud secrets add-iam-policy-binding slack-bot-token \
+  --member="serviceAccount:hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+
+gcloud secrets add-iam-policy-binding slack-signing-secret \
+  --member="serviceAccount:hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
 ```
 
 Run deploy via Cloud Build:
@@ -148,7 +157,7 @@ Run deploy via Cloud Build:
 ```bash
 gcloud builds submit \
   --config cloudbuild.yaml \
-  --substitutions=_SERVICE_NAME=hcm-slackbot,_REGION="$REGION",_VERTEX_MODEL=gemini-2.0-flash-001
+  --substitutions=_SERVICE_NAME=hcm-slackbot,_REGION="$REGION",_VERTEX_MODEL=gemini-2.0-flash-001,_RUNTIME_SERVICE_ACCOUNT=hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com
 ```
 
 ### 4c) Optional: bootstrap script for one-time setup

@@ -13,6 +13,8 @@ Optional:
   --region REGION               GCP region (default: us-central1)
   --service-name NAME           Cloud Run service name (default: hcm-slackbot)
   --repo-name NAME              Artifact Registry repo name (default: hcm-slackbot)
+  --runtime-sa-email EMAIL      Runtime service account email
+                                (default: hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com)
   --slack-bot-token TOKEN       Create/update Secret Manager slack-bot-token
   --slack-signing-secret VALUE  Create/update Secret Manager slack-signing-secret
   --skip-secrets                Do not create/update secrets
@@ -28,6 +30,7 @@ PROJECT_ID=""
 REGION="us-central1"
 SERVICE_NAME="hcm-slackbot"
 REPO_NAME="hcm-slackbot"
+RUNTIME_SA_EMAIL="hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com"
 SKIP_SECRETS="false"
 SLACK_BOT_TOKEN=""
 SLACK_SIGNING_SECRET=""
@@ -48,6 +51,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --repo-name)
       REPO_NAME="${2:-}"
+      shift 2
+      ;;
+    --runtime-sa-email)
+      RUNTIME_SA_EMAIL="${2:-}"
       shift 2
       ;;
     --slack-bot-token)
@@ -102,6 +109,15 @@ fi
 
 PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
 CLOUDBUILD_SA="${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
+RUNTIME_SA_NAME="${RUNTIME_SA_EMAIL%@*}"
+
+echo "==> Ensuring runtime service account exists: $RUNTIME_SA_EMAIL"
+if ! gcloud iam service-accounts describe "$RUNTIME_SA_EMAIL" >/dev/null 2>&1; then
+  gcloud iam service-accounts create "$RUNTIME_SA_NAME" \
+    --display-name="HCM Slackbot Runtime SA" >/dev/null
+else
+  echo "Runtime service account already exists."
+fi
 
 echo "==> Granting Cloud Build IAM roles"
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
@@ -116,6 +132,15 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${CLOUDBUILD_SA}" \
   --role="roles/secretmanager.secretAccessor" >/dev/null
 
+echo "==> Granting runtime service account access to secrets"
+for secret_name in slack-bot-token slack-signing-secret; do
+  if gcloud secrets describe "$secret_name" >/dev/null 2>&1; then
+    gcloud secrets add-iam-policy-binding "$secret_name" \
+      --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
+      --role="roles/secretmanager.secretAccessor" >/dev/null
+  fi
+done
+
 if [[ "$SKIP_SECRETS" == "false" ]]; then
   echo "==> Ensuring required secrets exist"
   if ! gcloud secrets describe slack-bot-token >/dev/null 2>&1; then
@@ -124,6 +149,12 @@ if [[ "$SKIP_SECRETS" == "false" ]]; then
   if ! gcloud secrets describe slack-signing-secret >/dev/null 2>&1; then
     gcloud secrets create slack-signing-secret --replication-policy=automatic >/dev/null
   fi
+
+  for secret_name in slack-bot-token slack-signing-secret; do
+    gcloud secrets add-iam-policy-binding "$secret_name" \
+      --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
+      --role="roles/secretmanager.secretAccessor" >/dev/null
+  done
 
   if [[ -n "$SLACK_BOT_TOKEN" ]]; then
     printf "%s" "$SLACK_BOT_TOKEN" | gcloud secrets versions add slack-bot-token --data-file=- >/dev/null
@@ -142,7 +173,7 @@ Bootstrap complete.
 Next deploy command:
   gcloud builds submit \\
     --config cloudbuild.yaml \\
-    --substitutions=_SERVICE_NAME=${SERVICE_NAME},_REGION=${REGION},_VERTEX_MODEL=gemini-2.0-flash-001
+    --substitutions=_SERVICE_NAME=${SERVICE_NAME},_REGION=${REGION},_VERTEX_MODEL=gemini-2.0-flash-001,_RUNTIME_SERVICE_ACCOUNT=${RUNTIME_SA_EMAIL}
 
 After first deploy, set Slack Event Request URL to:
   https://<CLOUD_RUN_URL>/slack/events
