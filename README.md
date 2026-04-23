@@ -63,6 +63,20 @@ In Slack API dashboard:
 4. Install app to workspace.
 5. Invite bot to channel(s): `/invite @your-bot-name`
 
+Capture allowlist identifiers (required for secure runtime):
+
+- `APP_ID` from **Basic Information → App Credentials** (starts with `A...`)
+- `TEAM_ID` from `auth.test` using your bot token (starts with `T...`)
+
+Example:
+
+```bash
+curl -sS -X POST https://slack.com/api/auth.test \
+  -H "Authorization: Bearer xoxb-..."
+```
+
+Use returned `team_id` for `SLACK_ALLOWED_TEAM_IDS`.
+
 ### 3) Create GCP secrets (one-time)
 
 ```bash
@@ -102,7 +116,7 @@ gcloud run deploy hcm-slackbot \
   --region "$REGION" \
   --allow-unauthenticated \
   --service-account hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com \
-  --set-env-vars GOOGLE_CLOUD_PROJECT="$PROJECT_ID",GOOGLE_CLOUD_LOCATION="$REGION",VERTEX_MODEL=gemini-2.0-flash-001,HCM_DB_PATH=kb/hcm_kb.sqlite \
+  --set-env-vars GOOGLE_CLOUD_PROJECT="$PROJECT_ID",GOOGLE_CLOUD_LOCATION="$REGION",VERTEX_MODEL=gemini-2.0-flash-001,HCM_DB_PATH=kb/hcm_kb.sqlite,SLACK_ALLOWED_TEAM_IDS=T0123456789,SLACK_ALLOWED_APP_IDS=A0123456789 \
   --set-secrets SLACK_BOT_TOKEN=slack-bot-token:latest,SLACK_SIGNING_SECRET=slack-signing-secret:latest
 ```
 
@@ -175,7 +189,7 @@ Run deploy via Cloud Build:
 ```bash
 gcloud builds submit \
   --config cloudbuild.yaml \
-  --substitutions=_SERVICE_NAME=hcm-slackbot,_REGION="$REGION",_VERTEX_MODEL=gemini-2.0-flash-001,_RUNTIME_SERVICE_ACCOUNT=hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com
+  --substitutions=_SERVICE_NAME=hcm-slackbot,_REGION="$REGION",_VERTEX_MODEL=gemini-2.0-flash-001,_RUNTIME_SERVICE_ACCOUNT=hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com,_SLACK_ALLOWED_TEAM_IDS=T0123456789,_SLACK_ALLOWED_APP_IDS=A0123456789
 ```
 
 ### 4c) Optional: bootstrap script for one-time setup
@@ -193,9 +207,14 @@ If you want the script to also set secret values:
 scripts/bootstrap_gcp.sh \
   --project "$PROJECT_ID" \
   --region "$REGION" \
+  --slack-allowed-team-ids "T0123456789" \
+  --slack-allowed-app-ids "A0123456789" \
   --slack-bot-token "xoxb-..." \
   --slack-signing-secret "your-signing-secret"
 ```
+
+Security note: the app now fails closed unless incoming events match
+`SLACK_ALLOWED_TEAM_IDS` and `SLACK_ALLOWED_APP_IDS`.
 
 Optional: create a GitHub trigger in Cloud Build UI pointing to `main` so deploys
 happen automatically on each push.

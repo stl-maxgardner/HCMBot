@@ -27,7 +27,7 @@ steps:
       - --service-account
       - ${_RUNTIME_SERVICE_ACCOUNT}
       - --set-env-vars
-      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${_REGION},VERTEX_MODEL=${_VERTEX_MODEL},HCM_DB_PATH=kb/hcm_kb.sqlite
+      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${_REGION},VERTEX_MODEL=${_VERTEX_MODEL},HCM_DB_PATH=kb/hcm_kb.sqlite,SLACK_ALLOWED_TEAM_IDS=${_SLACK_ALLOWED_TEAM_IDS},SLACK_ALLOWED_APP_IDS=${_SLACK_ALLOWED_APP_IDS}
       - --set-secrets
       - SLACK_BOT_TOKEN=slack-bot-token:latest,SLACK_SIGNING_SECRET=slack-signing-secret:latest
 
@@ -39,4 +39,6 @@ substitutions:
   _REGION: us-central1
   _VERTEX_MODEL: gemini-2.0-flash-001
   _RUNTIME_SERVICE_ACCOUNT: hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com
+  _SLACK_ALLOWED_TEAM_IDS: T0123456789
+  _SLACK_ALLOWED_APP_IDS: A0123456789
   _IMAGE_URI: ${_REGION}-docker.pkg.dev/${PROJECT_ID}/hcm-slackbot/hcm-slackbot:${SHORT_SHA}
