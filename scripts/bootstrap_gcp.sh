@@ -15,6 +15,8 @@ Optional:
   --repo-name NAME              Artifact Registry repo name (default: hcm-slackbot)
   --runtime-sa-email EMAIL      Runtime service account email
                                 (default: hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com)
+  --slack-allowed-team-ids IDS  Comma-separated Slack Team IDs allowlist (required for app runtime)
+  --slack-allowed-app-ids IDS   Comma-separated Slack App IDs allowlist (required for app runtime)
   --slack-bot-token TOKEN       Create/update Secret Manager slack-bot-token
   --slack-signing-secret VALUE  Create/update Secret Manager slack-signing-secret
   --skip-secrets                Do not create/update secrets
@@ -31,6 +33,8 @@ REGION="us-central1"
 SERVICE_NAME="hcm-slackbot"
 REPO_NAME="hcm-slackbot"
 RUNTIME_SA_EMAIL="hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com"
+SLACK_ALLOWED_TEAM_IDS=""
+SLACK_ALLOWED_APP_IDS=""
 SKIP_SECRETS="false"
 SLACK_BOT_TOKEN=""
 SLACK_SIGNING_SECRET=""
@@ -55,6 +59,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --runtime-sa-email)
       RUNTIME_SA_EMAIL="${2:-}"
+      shift 2
+      ;;
+    --slack-allowed-team-ids)
+      SLACK_ALLOWED_TEAM_IDS="${2:-}"
+      shift 2
+      ;;
+    --slack-allowed-app-ids)
+      SLACK_ALLOWED_APP_IDS="${2:-}"
       shift 2
       ;;
     --slack-bot-token)
@@ -83,6 +95,12 @@ done
 
 if [[ -z "$PROJECT_ID" ]]; then
   echo "--project is required." >&2
+  usage
+  exit 1
+fi
+
+if [[ -z "$SLACK_ALLOWED_TEAM_IDS" || -z "$SLACK_ALLOWED_APP_IDS" ]]; then
+  echo "--slack-allowed-team-ids and --slack-allowed-app-ids are required." >&2
   usage
   exit 1
 fi
@@ -173,7 +191,7 @@ Bootstrap complete.
 Next deploy command:
   gcloud builds submit \\
     --config cloudbuild.yaml \\
-    --substitutions=_SERVICE_NAME=${SERVICE_NAME},_REGION=${REGION},_VERTEX_MODEL=gemini-2.0-flash-001,_RUNTIME_SERVICE_ACCOUNT=${RUNTIME_SA_EMAIL}
+    --substitutions=_SERVICE_NAME=${SERVICE_NAME},_REGION=${REGION},_VERTEX_MODEL=gemini-2.0-flash-001,_RUNTIME_SERVICE_ACCOUNT=${RUNTIME_SA_EMAIL},_SLACK_ALLOWED_TEAM_IDS=${SLACK_ALLOWED_TEAM_IDS},_SLACK_ALLOWED_APP_IDS=${SLACK_ALLOWED_APP_IDS}
 
 After first deploy, set Slack Event Request URL to:
   https://<CLOUD_RUN_URL>/slack/events

@@ -54,14 +54,29 @@ QUESTION_STOPWORDS = {
 
 
 def ensure_env() -> None:
-    required = ["SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET", "GOOGLE_CLOUD_PROJECT"]
+    required = [
+        "SLACK_BOT_TOKEN",
+        "SLACK_SIGNING_SECRET",
+        "GOOGLE_CLOUD_PROJECT",
+        "SLACK_ALLOWED_TEAM_IDS",
+        "SLACK_ALLOWED_APP_IDS",
+    ]
     missing = [name for name in required if not os.getenv(name)]
     if missing:
         raise RuntimeError(
             f"Missing required environment variables: {', '.join(missing)}"
         )
+    if not parse_csv_env("SLACK_ALLOWED_TEAM_IDS"):
+        raise RuntimeError("SLACK_ALLOWED_TEAM_IDS must contain at least one team ID.")
+    if not parse_csv_env("SLACK_ALLOWED_APP_IDS"):
+        raise RuntimeError("SLACK_ALLOWED_APP_IDS must contain at least one app ID.")
     if not DB_PATH.exists():
         raise RuntimeError(f"HCM DB not found: {DB_PATH}")
+
+
+def parse_csv_env(name: str) -> set[str]:
+    value = os.getenv(name, "")
+    return {item.strip() for item in value.split(",") if item.strip()}
 
 
 def question_to_fts_query(question: str, max_terms: int = 12) -> str:
@@ -203,6 +218,8 @@ def create_flask_app() -> Flask:
     bolt_app = create_bolt_app()
     handler = SlackRequestHandler(bolt_app)
     signature_verifier = SignatureVerifier(os.environ["SLACK_SIGNING_SECRET"])
+    allowed_team_ids = parse_csv_env("SLACK_ALLOWED_TEAM_IDS")
+    allowed_app_ids = parse_csv_env("SLACK_ALLOWED_APP_IDS")
     app = Flask(__name__)
 
     @app.get("/")
@@ -218,6 +235,11 @@ def create_flask_app() -> Flask:
         payload = request.get_json(silent=True) or {}
         if payload.get("type") == "url_verification" and "challenge" in payload:
             return jsonify({"challenge": payload["challenge"]})
+
+        team_id = payload.get("team_id")
+        app_id = payload.get("api_app_id")
+        if team_id not in allowed_team_ids or app_id not in allowed_app_ids:
+            return jsonify({"ok": False, "error": "forbidden_workspace_or_app"}), 403
         return handler.handle(request)
 
     return app
