@@ -13,6 +13,7 @@ from flask import Flask, jsonify, request
 from google import genai
 from slack_bolt import App
 from slack_bolt.adapter.flask import SlackRequestHandler
+from slack_sdk.signature import SignatureVerifier
 
 DB_PATH = Path(os.getenv("HCM_DB_PATH", "kb/hcm_kb.sqlite"))
 TOP_K = int(os.getenv("HCM_TOP_K", "8"))
@@ -201,6 +202,7 @@ def create_flask_app() -> Flask:
     ensure_env()
     bolt_app = create_bolt_app()
     handler = SlackRequestHandler(bolt_app)
+    signature_verifier = SignatureVerifier(os.environ["SLACK_SIGNING_SECRET"])
     app = Flask(__name__)
 
     @app.get("/")
@@ -209,6 +211,10 @@ def create_flask_app() -> Flask:
 
     @app.post("/slack/events")
     def slack_events() -> Any:
+        body = request.get_data()
+        if not signature_verifier.is_valid_request(body=body, headers=request.headers):
+            return jsonify({"ok": False, "error": "invalid_signature"}), 401
+
         payload = request.get_json(silent=True) or {}
         if payload.get("type") == "url_verification" and "challenge" in payload:
             return jsonify({"challenge": payload["challenge"]})
