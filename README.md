@@ -106,6 +106,24 @@ gcloud run deploy hcm-slackbot \
   --set-secrets SLACK_BOT_TOKEN=slack-bot-token:latest,SLACK_SIGNING_SECRET=slack-signing-secret:latest
 ```
 
+If deploy prints `Setting IAM policy failed`, your user likely lacks permission to
+grant public invoker during deploy. In that case, run (or ask an admin to run):
+
+```bash
+gcloud beta run services add-iam-policy-binding hcm-slackbot \
+  --region "$REGION" \
+  --member=allUsers \
+  --role=roles/run.invoker
+```
+
+Verify policy includes `allUsers`:
+
+```bash
+gcloud run services get-iam-policy hcm-slackbot \
+  --region "$REGION" \
+  --format=yaml
+```
+
 ### 4b) Optional: one-command deploys with Cloud Build
 
 This repo includes:
