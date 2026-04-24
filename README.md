@@ -175,6 +175,10 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${CLOUDBUILD_SA}" \
   --role="roles/secretmanager.secretAccessor"
 
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com" \
+  --role="roles/aiplatform.user"
+
 gcloud secrets add-iam-policy-binding slack-bot-token \
   --member="serviceAccount:hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com" \
   --role="roles/secretmanager.secretAccessor"
@@ -198,7 +202,11 @@ Use the helper script to enable APIs, create Artifact Registry, and set IAM role
 
 ```bash
 chmod +x scripts/bootstrap_gcp.sh
-scripts/bootstrap_gcp.sh --project "$PROJECT_ID" --region "$REGION"
+scripts/bootstrap_gcp.sh \
+  --project "$PROJECT_ID" \
+  --region "$REGION" \
+  --slack-allowed-team-ids "T0123456789" \
+  --slack-allowed-app-ids "A0123456789"
 ```
 
 If you want the script to also set secret values:
@@ -215,6 +223,18 @@ scripts/bootstrap_gcp.sh \
 
 Security note: the app now fails closed unless incoming events match
 `SLACK_ALLOWED_TEAM_IDS` and `SLACK_ALLOWED_APP_IDS`.
+
+If Slack only shows `Searching the HCM knowledge base...` with no final answer, check
+Cloud Run logs for `HCMBOT_ERROR` and ensure the runtime service account has
+`roles/aiplatform.user` on the project:
+
+```bash
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com" \
+  --role="roles/aiplatform.user"
+
+gcloud run services logs read hcm-slackbot --region "$REGION" --limit 100
+```
 
 Optional: create a GitHub trigger in Cloud Build UI pointing to `main` so deploys
 happen automatically on each push.

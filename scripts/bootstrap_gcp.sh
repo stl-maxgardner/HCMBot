@@ -159,6 +159,11 @@ for secret_name in slack-bot-token slack-signing-secret; do
   fi
 done
 
+echo "==> Granting runtime service account Vertex AI role"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
+  --role="roles/aiplatform.user" >/dev/null
+
 if [[ "$SKIP_SECRETS" == "false" ]]; then
   echo "==> Ensuring required secrets exist"
   if ! gcloud secrets describe slack-bot-token >/dev/null 2>&1; then
