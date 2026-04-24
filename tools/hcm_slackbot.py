@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import sqlite3
@@ -20,6 +21,7 @@ TOP_K = int(os.getenv("HCM_TOP_K", "8"))
 MAX_CHARS_PER_SNIPPET = int(os.getenv("HCM_MAX_CHARS_PER_SNIPPET", "650"))
 VERTEX_MODEL = os.getenv("VERTEX_MODEL", "gemini-2.0-flash-001")
 GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+LOGGER = logging.getLogger(__name__)
 
 QUESTION_STOPWORDS = {
     "a",
@@ -179,8 +181,16 @@ def handle_question(question: str, say) -> None:  # type: ignore[no-untyped-def]
         say("Ask me an HCM question.")
         return
     say("Searching the HCM knowledge base...")
-    evidence = search_hcm(question)
-    answer = answer_with_vertex(question, evidence)
+    try:
+        evidence = search_hcm(question)
+        answer = answer_with_vertex(question, evidence)
+    except Exception:
+        LOGGER.exception("HCMBOT_ERROR: failed while answering question")
+        say(
+            "I hit an internal error while answering that question. "
+            "Please try again shortly. If it keeps failing, check Cloud Run logs."
+        )
+        return
     say(answer)
 
 
@@ -246,6 +256,10 @@ def create_flask_app() -> Flask:
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=os.getenv("LOG_LEVEL", "INFO"),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     app = create_flask_app()
     port = int(os.getenv("PORT", "8080"))
     app.run(host="0.0.0.0", port=port)
