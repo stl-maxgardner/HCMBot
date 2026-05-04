@@ -116,7 +116,7 @@ gcloud run deploy hcm-slackbot \
   --region "$REGION" \
   --allow-unauthenticated \
   --service-account hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com \
-  --set-env-vars GOOGLE_CLOUD_PROJECT="$PROJECT_ID",GOOGLE_CLOUD_LOCATION="$REGION",VERTEX_MODEL=gemini-2.0-flash-001,HCM_DB_PATH=kb/hcm_kb.sqlite,SLACK_ALLOWED_TEAM_IDS=T0123456789,SLACK_ALLOWED_APP_IDS=A0123456789 \
+  --set-env-vars GOOGLE_CLOUD_PROJECT="$PROJECT_ID",GOOGLE_CLOUD_LOCATION=global,VERTEX_MODEL=gemini-2.0-flash,HCM_DB_PATH=kb/hcm_kb.sqlite,SLACK_ALLOWED_TEAM_IDS=T0123456789,SLACK_ALLOWED_APP_IDS=A0123456789 \
   --set-secrets SLACK_BOT_TOKEN=slack-bot-token:latest,SLACK_SIGNING_SECRET=slack-signing-secret:latest
 ```
 
@@ -193,7 +193,7 @@ Run deploy via Cloud Build:
 ```bash
 gcloud builds submit \
   --config cloudbuild.yaml \
-  --substitutions=_SERVICE_NAME=hcm-slackbot,_REGION="$REGION",_VERTEX_MODEL=gemini-2.0-flash-001,_RUNTIME_SERVICE_ACCOUNT=hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com,_SLACK_ALLOWED_TEAM_IDS=T0123456789,_SLACK_ALLOWED_APP_IDS=A0123456789
+  --substitutions=_SERVICE_NAME=hcm-slackbot,_REGION="$REGION",_VERTEX_MODEL=gemini-2.0-flash,_VERTEX_LOCATION=global,_RUNTIME_SERVICE_ACCOUNT=hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com,_SLACK_ALLOWED_TEAM_IDS=T0123456789,_SLACK_ALLOWED_APP_IDS=A0123456789
 ```
 
 ### 4c) Optional: bootstrap script for one-time setup
