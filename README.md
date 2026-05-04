@@ -85,14 +85,16 @@ Optional (for clickable citations to SharePoint-hosted PDFs):
   URLs (easy for local `.env` usage).
 - Or set `HCM_DOC_URL_MAP_B64` to the same JSON object base64-encoded (useful
   for Cloud Build substitutions).
+- A repo template exists at `kb/hcm_doc_url_map.template.json` with all
+  required keys, including all three 2016 6th-edition PDFs (`vol1`, `vol2`,
+  `vol3`).
 
 Example mapping JSON:
 
-```json
-{
-  "hcm_2010_5th_edition.pdf": "https://contoso.sharepoint.com/sites/hcm/Shared%20Documents/HCM/hcm_2010_5th_edition.pdf",
-  "hcm_2000_4th_edition.pdf": "https://contoso.sharepoint.com/sites/hcm/Shared%20Documents/HCM/hcm_2000_4th_edition.pdf"
-}
+Copy the template and fill in each URL:
+
+```bash
+cp kb/hcm_doc_url_map.template.json kb/hcm_doc_url_map.json
 ```
 
 Encode and export:
@@ -100,10 +102,8 @@ Encode and export:
 ```bash
 export HCM_DOC_URL_MAP_B64="$(python3 - <<'PY'
 import base64, json
-mapping = {
-  "hcm_2010_5th_edition.pdf": "https://contoso.sharepoint.com/sites/hcm/Shared%20Documents/HCM/hcm_2010_5th_edition.pdf",
-  "hcm_2000_4th_edition.pdf": "https://contoso.sharepoint.com/sites/hcm/Shared%20Documents/HCM/hcm_2000_4th_edition.pdf",
-}
+with open("kb/hcm_doc_url_map.json", "r", encoding="utf-8") as fh:
+    mapping = json.load(fh)
 print(base64.b64encode(json.dumps(mapping).encode()).decode())
 PY
 )"
