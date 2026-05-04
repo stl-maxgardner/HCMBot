@@ -81,13 +81,13 @@ Optional (for clickable citations to SharePoint-hosted PDFs):
 
 - Set `HCM_DOC_BASE_URL` to a SharePoint folder URL that contains the PDFs.
   The bot will append URL-encoded filenames automatically.
-- Or set `HCM_DOC_URL_MAP_JSON` to a JSON object mapping filenames to exact
-  URLs (easy for local `.env` usage).
-- Or set `HCM_DOC_URL_MAP_B64` to the same JSON object base64-encoded (useful
-  for Cloud Build substitutions).
+- The bot reads URL mappings from a JSON file at
+  `kb/hcm_doc_url_map.json` by default.
 - A repo template exists at `kb/hcm_doc_url_map.template.json` with all
   required keys, including all three 2016 6th-edition PDFs (`vol1`, `vol2`,
   `vol3`).
+- Optional: override the file path with `HCM_DOC_URL_MAP_PATH`.
+- Optional advanced override: set `HCM_DOC_URL_MAP_JSON` in env.
 
 Example mapping JSON:
 
@@ -95,18 +95,6 @@ Copy the template and fill in each URL:
 
 ```bash
 cp kb/hcm_doc_url_map.template.json kb/hcm_doc_url_map.json
-```
-
-Encode and export:
-
-```bash
-export HCM_DOC_URL_MAP_B64="$(python3 - <<'PY'
-import base64, json
-with open("kb/hcm_doc_url_map.json", "r", encoding="utf-8") as fh:
-    mapping = json.load(fh)
-print(base64.b64encode(json.dumps(mapping).encode()).decode())
-PY
-)"
 ```
 
 ### 3) Create GCP secrets (one-time)
@@ -148,7 +136,7 @@ gcloud run deploy hcm-slackbot \
   --region "$REGION" \
   --allow-unauthenticated \
   --service-account hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com \
-  --set-env-vars GOOGLE_CLOUD_PROJECT="$PROJECT_ID",GOOGLE_CLOUD_LOCATION="$REGION",VERTEX_MODEL=gemini-2.5-flash,HCM_DB_PATH=kb/hcm_kb.sqlite,SLACK_ALLOWED_TEAM_IDS=T0123456789,SLACK_ALLOWED_APP_IDS=A0123456789,HCM_DOC_BASE_URL=https://contoso.sharepoint.com/sites/hcm/Shared%20Documents/HCM,HCM_DOC_URL_MAP_B64="$HCM_DOC_URL_MAP_B64" \
+  --set-env-vars GOOGLE_CLOUD_PROJECT="$PROJECT_ID",GOOGLE_CLOUD_LOCATION="$REGION",VERTEX_MODEL=gemini-2.5-flash,HCM_DB_PATH=kb/hcm_kb.sqlite,SLACK_ALLOWED_TEAM_IDS=T0123456789,SLACK_ALLOWED_APP_IDS=A0123456789,HCM_DOC_BASE_URL= \
   --set-secrets SLACK_BOT_TOKEN=slack-bot-token:latest,SLACK_SIGNING_SECRET=slack-signing-secret:latest
 ```
 
@@ -225,7 +213,7 @@ Run deploy via Cloud Build:
 ```bash
 gcloud builds submit \
   --config cloudbuild.yaml \
-  --substitutions=_SERVICE_NAME=hcm-slackbot,_REGION="$REGION",_VERTEX_MODEL=gemini-2.5-flash,_VERTEX_LOCATION="$REGION",_RUNTIME_SERVICE_ACCOUNT=hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com,_SLACK_ALLOWED_TEAM_IDS=T0123456789,_SLACK_ALLOWED_APP_IDS=A0123456789,_HCM_DOC_BASE_URL=https://contoso.sharepoint.com/sites/hcm/Shared%20Documents/HCM,_HCM_DOC_URL_MAP_B64="$HCM_DOC_URL_MAP_B64"
+  --substitutions=_SERVICE_NAME=hcm-slackbot,_REGION="$REGION",_VERTEX_MODEL=gemini-2.5-flash,_VERTEX_LOCATION="$REGION",_RUNTIME_SERVICE_ACCOUNT=hcm-slackbot-sa@stl-datascience.iam.gserviceaccount.com,_SLACK_ALLOWED_TEAM_IDS=T0123456789,_SLACK_ALLOWED_APP_IDS=A0123456789,_HCM_DOC_BASE_URL=
 ```
 
 ### 4c) Optional: bootstrap script for one-time setup

@@ -27,6 +27,7 @@ VERTEX_MODEL = os.getenv("VERTEX_MODEL", "gemini-2.5-flash")
 GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 LOGGER = logging.getLogger(__name__)
 DOC_BASE_URL = os.getenv("HCM_DOC_BASE_URL", "").strip()
+DOC_URL_MAP_PATH = Path(os.getenv("HCM_DOC_URL_MAP_PATH", "kb/hcm_doc_url_map.json"))
 
 QUESTION_STOPWORDS = {
     "a",
@@ -87,14 +88,29 @@ def parse_csv_env(name: str) -> set[str]:
 
 
 def load_doc_url_map() -> dict[str, str]:
+    source_label = "env"
     raw_json = os.getenv("HCM_DOC_URL_MAP_JSON", "").strip()
     raw_b64 = os.getenv("HCM_DOC_URL_MAP_B64", "").strip()
     if raw_b64:
+        LOGGER.warning(
+            "HCM_DOC_URL_MAP_B64 is deprecated; prefer HCM_DOC_URL_MAP_PATH file mapping."
+        )
         try:
             raw_json = base64.b64decode(raw_b64).decode("utf-8")
         except (binascii.Error, UnicodeDecodeError):
             LOGGER.warning("Ignoring invalid HCM_DOC_URL_MAP_B64 value.")
-            return {}
+            raw_json = ""
+    if not raw_json:
+        file_candidates = [DOC_URL_MAP_PATH, Path("kb/hcm_doc_url_map.template.json")]
+        for path in file_candidates:
+            if not path.exists():
+                continue
+            try:
+                raw_json = path.read_text(encoding="utf-8")
+                source_label = str(path)
+                break
+            except OSError:
+                LOGGER.warning("Ignoring unreadable URL map file at %s", path)
     if not raw_json:
         return {}
     try:
@@ -114,6 +130,8 @@ def load_doc_url_map() -> dict[str, str]:
             continue
         # Normalize keys to filename only so map keys can be either full path or filename.
         url_map[Path(key).name] = cleaned_url
+    if url_map:
+        LOGGER.info("Loaded %d citation URL mappings from %s", len(url_map), source_label)
     return url_map
 
 
