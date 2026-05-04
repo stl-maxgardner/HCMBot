@@ -196,7 +196,7 @@ Bootstrap complete.
 Next deploy command:
   gcloud builds submit \\
     --config cloudbuild.yaml \\
-    --substitutions=_SERVICE_NAME=${SERVICE_NAME},_REGION=${REGION},_VERTEX_LOCATION=global,_VERTEX_MODEL=gemini-2.0-flash,_RUNTIME_SERVICE_ACCOUNT=${RUNTIME_SA_EMAIL},_SLACK_ALLOWED_TEAM_IDS=${SLACK_ALLOWED_TEAM_IDS},_SLACK_ALLOWED_APP_IDS=${SLACK_ALLOWED_APP_IDS}
+    --substitutions=_SERVICE_NAME=${SERVICE_NAME},_REGION=${REGION},_VERTEX_LOCATION=${REGION},_VERTEX_MODEL=gemini-2.5-flash,_RUNTIME_SERVICE_ACCOUNT=${RUNTIME_SA_EMAIL},_SLACK_ALLOWED_TEAM_IDS=${SLACK_ALLOWED_TEAM_IDS},_SLACK_ALLOWED_APP_IDS=${SLACK_ALLOWED_APP_IDS}
 
 After first deploy, set Slack Event Request URL to:
   https://<CLOUD_RUN_URL>/slack/events
