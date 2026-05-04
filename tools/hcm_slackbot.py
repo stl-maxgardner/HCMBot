@@ -3,12 +3,16 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 import logging
 import os
 import re
 import sqlite3
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from flask import Flask, jsonify, request
 from google import genai
@@ -22,6 +26,7 @@ MAX_CHARS_PER_SNIPPET = int(os.getenv("HCM_MAX_CHARS_PER_SNIPPET", "650"))
 VERTEX_MODEL = os.getenv("VERTEX_MODEL", "gemini-2.5-flash")
 GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 LOGGER = logging.getLogger(__name__)
+DOC_BASE_URL = os.getenv("HCM_DOC_BASE_URL", "").strip()
 
 QUESTION_STOPWORDS = {
     "a",
@@ -79,6 +84,67 @@ def ensure_env() -> None:
 def parse_csv_env(name: str) -> set[str]:
     value = os.getenv(name, "")
     return {item.strip() for item in value.split(",") if item.strip()}
+
+
+def load_doc_url_map() -> dict[str, str]:
+    raw_json = os.getenv("HCM_DOC_URL_MAP_JSON", "").strip()
+    raw_b64 = os.getenv("HCM_DOC_URL_MAP_B64", "").strip()
+    if raw_b64:
+        try:
+            raw_json = base64.b64decode(raw_b64).decode("utf-8")
+        except (binascii.Error, UnicodeDecodeError):
+            LOGGER.warning("Ignoring invalid HCM_DOC_URL_MAP_B64 value.")
+            return {}
+    if not raw_json:
+        return {}
+    try:
+        parsed = json.loads(raw_json)
+    except json.JSONDecodeError:
+        LOGGER.warning("Ignoring invalid HCM_DOC_URL_MAP_JSON value.")
+        return {}
+    if not isinstance(parsed, dict):
+        LOGGER.warning("Ignoring HCM_DOC_URL_MAP value because it is not a JSON object.")
+        return {}
+    url_map: dict[str, str] = {}
+    for key, value in parsed.items():
+        if not isinstance(key, str) or not isinstance(value, str):
+            continue
+        cleaned_url = value.strip()
+        if not cleaned_url:
+            continue
+        # Normalize keys to filename only so map keys can be either full path or filename.
+        url_map[Path(key).name] = cleaned_url
+    return url_map
+
+
+DOC_URL_MAP = load_doc_url_map()
+
+
+def resolve_doc_url(doc_name: str) -> str | None:
+    mapped_url = DOC_URL_MAP.get(Path(doc_name).name)
+    if mapped_url:
+        return mapped_url
+    if not DOC_BASE_URL:
+        return None
+    return f"{DOC_BASE_URL.rstrip('/')}/{quote(Path(doc_name).name)}"
+
+
+def build_citations_block(evidence: list[dict[str, Any]]) -> str:
+    seen: set[tuple[str, Any]] = set()
+    lines: list[str] = []
+    for item in evidence:
+        doc_name = item["doc_name"]
+        page = item["page"]
+        key = (doc_name, page)
+        if key in seen:
+            continue
+        seen.add(key)
+        doc_url = resolve_doc_url(doc_name)
+        if doc_url:
+            lines.append(f"- <{doc_url}|{doc_name}> p.{page}")
+        else:
+            lines.append(f"- {doc_name} p.{page}")
+    return "\n".join(lines)
 
 
 def question_to_fts_query(question: str, max_terms: int = 12) -> str:
@@ -150,9 +216,8 @@ def build_prompt(question: str, evidence: list[dict[str, Any]]) -> str:
         "You answer Highway Capacity Manual questions.\n"
         "Use only the evidence snippets provided.\n"
         "If evidence is weak or conflicting, state uncertainty.\n"
-        "Respond with:\n"
-        "- concise answer (2-6 bullets)\n"
-        "- 'Citations' section with filename + page\n\n"
+        "Respond with concise answer (2-6 bullets).\n"
+        "Do not include a citations section.\n\n"
         f"Question: {question}\n\n"
         f"Evidence:\n{''.join(snippets)}"
     )
@@ -190,6 +255,10 @@ def handle_question(question: str, say) -> None:  # type: ignore[no-untyped-def]
             "I hit an internal error while answering that question. "
             "Please try again shortly. If it keeps failing, check Cloud Run logs."
         )
+        return
+    citations = build_citations_block(evidence)
+    if citations:
+        say(f"{answer}\n\n*Citations*\n{citations}")
         return
     say(answer)
 
