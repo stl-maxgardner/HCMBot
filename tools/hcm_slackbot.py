@@ -19,7 +19,7 @@ from slack_sdk.signature import SignatureVerifier
 DB_PATH = Path(os.getenv("HCM_DB_PATH", "kb/hcm_kb.sqlite"))
 TOP_K = int(os.getenv("HCM_TOP_K", "8"))
 MAX_CHARS_PER_SNIPPET = int(os.getenv("HCM_MAX_CHARS_PER_SNIPPET", "650"))
-VERTEX_MODEL = os.getenv("VERTEX_MODEL", "gemini-2.0-flash-001")
+VERTEX_MODEL = os.getenv("VERTEX_MODEL", "gemini-2.5-flash")
 GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 LOGGER = logging.getLogger(__name__)
 
